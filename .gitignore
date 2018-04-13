@@ -1,0 +1,15 @@
+*
+!.gitignore
+!DeathMatters.esp
+
+!Scripts/
+Scripts/*
+
+!Scripts/Source/
+Scripts/Source/*
+
+!Scripts/Source/User/
+Scripts/Source/User/*
+
+
+!Scripts/Source/User/DM_*
