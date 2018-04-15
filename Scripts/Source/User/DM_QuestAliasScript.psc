@@ -47,7 +47,7 @@ int prevOutfitChoice = -1
 
 ; EVENTS
 ;==================================================
-; Main Death/Respawn Control Function
+; Main Death/Respawn Control Event
 Event OnEnterBleedout()
 	; Play death music and mute sounds
 	MUSSpecialDeath.Add()
@@ -100,11 +100,11 @@ Event OnEnterBleedout()
 EndEvent
 
 ; Onload verify if DM is enabled or not
-Event OnPlayerLoadGame()
-	ObjectReference SanctuaryID = Game.GetForm(0x000250FE) as ObjectReference
-	workshopscript SanctuaryRef
+Event OnPlayerLoadGame()	
 	; If the player previously was missing sanctuary check again
 	if PlayerRef.HasKeyword(DM_DisabledKeyword)
+		ObjectReference SanctuaryID = Game.GetForm(0x000250FE) as ObjectReference
+		workshopscript SanctuaryRef
 		; Mod shouldn't start until player gets sanctuary settlement
 		SanctuaryRef = SanctuaryID as workshopscript
 		if SanctuaryRef
@@ -132,9 +132,8 @@ EndEvent
 
 ;FUNCTIONS
 ;================================================
-; Find the settlement closest to player and 
-; respawn them there
-; Startup mod if not yet started
+; Startup mod
+; (only called if mod was not initally started with quest)
 Function StartupDM()
 	DM_StartMessage.Show()
 	if (PlayerRef.GetItemCount(DM_Holotape) == 0)
@@ -144,10 +143,11 @@ Function StartupDM()
 EndFunction
 
 ; Gives the player a random outfit and starting items
+; TODO: Add more outfits
 Function EquipPlayer()
 	; Select a random index from formlist
 	; Equip player with that outfit
-	; give player same starting items
+	; always give player same starting items
 	; Reroll if outfit is same as last time
 	int choice = utility.RandomInt(0, DM_OutfitList.GetSize() - 1)
 	while prevOutfitChoice == choice
@@ -167,7 +167,6 @@ Function EquipPlayer()
 	playerRef.AddItem(Caps001, 100, true)
 	playerRef.AddItem(Stimpak, 5, true)
 	playerRef.AddItem(LL_PipeGun, 1, true)
-	PlayerRef.EquipItem(LL_PipeGun)
 	playerRef.AddItem(Ammo38Caliber, 100, true)	
 EndFunction
 
@@ -227,7 +226,7 @@ Function SpawnandEquipClone()
 		clone.EquipItem(playerEquippedArmor[BipedSlotindex], true, true)
 	endWhile
 	
-	; Filty Synth!
+	; Filthy Synth!
 	clone.kill()
 	trace(self, "Player Clone killed")
 EndFunction
@@ -250,10 +249,12 @@ Function AffectSettlement(ObjectReference[] settlements, int settlementIndex)
 	endWhile
 	trace(self, "There are " + settlementMembers.Length + " potential settlers to replace")
 	
-	; The player is respawned at the nearest owned settlement where population is > 0
+	; The player is respawned at the nearest owned settlement where generic population is > 0
 	;  - If nearest settlement has no generic settlers or is unowned the next best settlement is checked and so on...
 	;  - If somehow the player has no qualified settlement they are simply respawned at
-	;    Sanctuary without any impact to the settlement(THIS SHOULD ALMOST NEVER HAPPEN)
+	;    Sanctuary without any impact to the settlement
+	;	 (this will probably happen more if player is early game but should stop once player gets
+	;	  more settlements)
 	if (settlementMembers.Length > 0 && workshopRef.OwnedbyPlayer)
 		trace(self, "Replacing settler at " + workshopRef)
 		workshopParent.RemoveActorFromWorkshopPUBLIC(settlementMembers[0] as WorkshopNPCScript)
@@ -261,7 +262,7 @@ Function AffectSettlement(ObjectReference[] settlements, int settlementIndex)
 		PlayerRef.MoveTo(settlements[settlementIndex])
 	else
 		if (!settlements.Length)
-			trace(self, "Somehow the player has no owned settlements with population > 0...")
+			trace(self, "No owned settlements with population > 0, moving to Santuary")
 			PlayerRef.MoveTo(DM_SettlementList.GetAt(0) as ObjectReference)
 		else
 			trace(self, "Settlement " + settlements[settlementindex] + " invalid, trying next settlement")
@@ -275,7 +276,7 @@ EndFunction
 ;Calculate settlement travel marker closest to player
 ;and return index in given list
 ;NOTE: This function returns an index instead of an objectref because
-;      AffectSettlement needs to know the index for Removing
+;      AffectSettlement needs to know the settlement index for Removing
 int Function FindNearestSettlement(ObjectReference[] settlements)
 	trace(self, "Calculate closest settlement")
 	ObjectReference settlement = settlements[0]
