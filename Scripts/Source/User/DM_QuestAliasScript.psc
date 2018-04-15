@@ -13,6 +13,8 @@ Actor Property PlayerRef Auto mandatory
 FollowersScript Property Followers const auto mandatory
 ObjectReference Property DM_DeathMarker Auto const mandatory
 Quest Property DM_RecoveryQuest const auto mandatory
+Message Property DM_RespawnMessage Auto const mandatory
+;ImageSpaceModifier Property RadIModFadeIn Auto const mandatory
 Group Startup
 	Keyword Property DM_EnabledKeyword Auto const mandatory
 	Keyword Property DM_DisabledKeyword Auto const mandatory
@@ -54,6 +56,7 @@ int prevOutfitChoice = -1
 Event OnEnterBleedout()
 	; Play death music and mute sounds
 	MUSSpecialDeath.Add()
+	;RadIModFadeIn.Apply(1)
 	AudioCategoryVOCGeneral.Mute()
 	AudioCategoryFSTnpc.Mute()
 	AudioCategoryWPNnpc.Mute()
@@ -91,7 +94,7 @@ Event OnEnterBleedout()
 	AudioCategoryWPNnpc.Unmute()
 	playerRespawning = false
 	trace(self, "Player has successfully respawned")
-	
+	DM_RespawnMessage.Show()
 	; Wait a few seconds then trigger Recovery
 	utility.wait(5)
 	if (!DM_RecoveryQuest.isRunning())
