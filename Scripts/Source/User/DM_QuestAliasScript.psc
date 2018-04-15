@@ -2,11 +2,6 @@ Scriptname DM_QuestAliasScript extends ReferenceAlias
 
 import DM_QuestScript
 
-; GENERAL TODO:
-; =================
-; - Try replacing playerref with "Self"
-; - Verify all Settlement markers are in the right location
-
 ;PROPERTIES
 ;==================================================
 Actor Property PlayerRef Auto mandatory
@@ -67,21 +62,21 @@ Event OnEnterBleedout()
 	Game.FadeoutGame(true, true, 1, 2, true)
 	DM_DeathMarker.Disable()
 	DM_DeathMarker.MoveTo(PlayerRef)
-	utility.wait(10)
+	utility.wait(2)
+	SpawnandEquipClone()
+	EquipPlayer()
+	DismissCompanions()
 
-	; Move formlist into an objectref array for settlement effects
+	; Move SettlementList into an objectref array for settlement effects
 	ObjectReference[] settlements = new ObjectReference[0]
 	int i = DM_SettlementList.GetSize()
 	While (i)
 		i -= 1
 		settlements.Add(DM_SettlementList.GetAt(i) as ObjectReference)	
 	EndWhile
-	
-	SpawnandEquipClone()
-	EquipPlayer()
-	DismissCompanions()
 
 	; Find closest settlement and respawn player there
+	; Player doesn't actually get moved until AffectSettlement() runs
 	int settlementIndex = FindNearestSettlement(settlements)
 	AffectSettlement(settlements, settlementIndex)
 	utility.wait(1)
