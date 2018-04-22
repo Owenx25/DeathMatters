@@ -12,6 +12,7 @@ Message Property DM_EarlyMessage Auto const Mandatory
 ; - Put in some logic for respawn markers at story tied settlements like Boston Airport, The Castle, and any others
 ; - Mess with changing players face with F4SE
 ; - Put in logic for Far Harbor DLC, need to warn player on mod page
+; - Give outfits their own weapons
 
 Event OnQuestInit()
 	trace(self, "Death Matters Quest Initialized")
