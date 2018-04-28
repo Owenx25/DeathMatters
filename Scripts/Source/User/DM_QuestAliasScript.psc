@@ -91,6 +91,7 @@ State Respawning
 	EndEvent
 
 	Event OnBeginState(string asOldState)
+		playerRef.StopCombat()
 		; Play death music and mute sounds
 		MUSSpecialDeath.Add()
 		;RadIModFadeIn.Apply(1)
