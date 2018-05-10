@@ -9,6 +9,9 @@ FollowersScript Property Followers const auto mandatory
 ObjectReference Property DM_DeathMarker Auto const mandatory
 Quest Property DM_RecoveryQuest const auto mandatory
 Message Property DM_RespawnMessage Auto const mandatory
+GlobalVariable Property DM_Difficulty Auto const mandatory
+GlobalVariable Property DM_CapsBeforeDeath Auto const mandatory
+Activator Property DM_CapsDropACTI Auto const mandatory
 ;ImageSpaceModifier Property RadIModFadeIn Auto const mandatory
 Group Startup
 	Keyword Property DM_EnabledKeyword Auto const mandatory
@@ -16,6 +19,7 @@ Group Startup
 	Message Property DM_StartMessage Auto const mandatory
 	Message Property DM_EarlyMessage Auto const mandatory
 	Holotape Property DM_Holotape Auto const mandatory
+	FormList Property DM_StartWorkshopList Auto const mandatory
 EndGroup
 Group SettlementEffects
 	FormList Property DM_SettlementList Auto const mandatory
@@ -47,39 +51,56 @@ int prevOutfitChoice = -1
 ; STATES/EVENTS
 ;==================================================
 auto State WaitingForDeath
+	;Reserved for Death Matters Difficulty
+	Event OnInit()
+		RegisterForPlayerSleep()
+	EndEvent
+
 	; Onload verify if DM is enabled or not
-	Event OnPlayerLoadGame()	
-		; If the player previously was missing sanctuary check again
+	Event OnPlayerLoadGame()
+		; If the player previously was missing a settlement check again
 		if PlayerRef.HasKeyword(DM_DisabledKeyword)
-			ObjectReference SanctuaryID = Game.GetForm(0x000250FE) as ObjectReference
-			workshopscript SanctuaryRef
-			; Mod shouldn't start until player gets sanctuary settlement
-			SanctuaryRef = SanctuaryID as workshopscript
-			if SanctuaryRef
-				if SanctuaryRef.OwnedbyPlayer
-					trace(self, "Player owns sanctuary on later pass")
-					PlayerRef.RemoveKeyword(DM_DisabledKeyword)
+			int index = DM_StartWorkshopList.GetSize() - 1
+			bool break = false
+			while index
+				ObjectReference settlementObj = DM_StartWorkshopList.GetAt(index) as ObjectReference
+				workshopscript settlement = settlementObj as workshopscript
+				if settlement.OwnedbyPlayer && !break
+					trace(self, "Player owns settlement on later pass")
+					; startup death matters
 					PlayerRef.AddKeyword(DM_EnabledKeyword)
-					StartupDM()
+					DM_StartMessage.Show()
+					if (PlayerRef.GetItemCount(DM_Holotape) == 0)
+						PlayerRef.AddItem(DM_Holotape, 1)
+					endif
+					PlayerRef.SetEssential(true)
+					break = true
+				EndIf
+				if break
+					index = 0
 				else
-					trace(self, "Player still missing sanctuary on later pass")
-					DM_EarlyMessage.Show()
+					index -= 1
 				endif
+			endWhile
+			if !break
+				trace(self, "Player still missing owned settlement on later pass")
+				DM_EarlyMessage.Show()
 			endif
+		endif
+	EndEvent
+
+	;Reserved for "Death Matters" Difficulty
+	Event OnPlayerSleepStop(bool abInterrupted, ObjectReference akBed)
+		if DM_Difficulty.GetValueInt() == 2
+			Game.SetInCharGen(false, false, false)
+			Game.RequestSave()
+			Game.SetInCharGen(true, false, false)
 		endif
 	EndEvent
 
 	Event OnEnterBleedout()
 		GotoState("Respawning")
 	EndEvent
-
-	Function StartupDM()
-		DM_StartMessage.Show()
-		if (PlayerRef.GetItemCount(DM_Holotape) == 0)
-			PlayerRef.AddItem(DM_Holotape, 1)
-		endif
-		PlayerRef.SetEssential(true)
-	EndFunction
 endState
 
 State Respawning
@@ -92,6 +113,7 @@ State Respawning
 
 	Event OnBeginState(string asOldState)
 		playerRef.StopCombat()
+		playerRef.StopCombatAlarm()
 		; Play death music and mute sounds
 		MUSSpecialDeath.Add()
 		;RadIModFadeIn.Apply(1)
@@ -104,12 +126,16 @@ State Respawning
 		Game.FadeoutGame(true, true, 1, 2, true)
 		DM_DeathMarker.Disable()
 		DM_DeathMarker.MoveTo(PlayerRef)
-		utility.wait(2)
-
-		SpawnandEquipClone()
-		EquipPlayer()
-		DismissCompanions()
-		DetermineSettlementCost()
+		;Debug.SetGodMode(true)
+		if DM_Difficulty.GetValueInt() == 0
+			CapsOnly()
+		else
+			SpawnandEquipClone()
+			EquipPlayer()
+			DismissCompanions()
+			DetermineSettlementCost()
+		endif
+		
 
 		; Fade back in and unmute sounds
 		DM_DeathMarker.Enable()
@@ -129,6 +155,22 @@ State Respawning
 		endif
 		GotoState("WaitingForDeath")
 	EndEvent
+
+	Function CapsOnly()
+		; Remove only the players caps
+		; Move them to closest settlement
+		DM_CapsBeforeDeath.SetValue(PlayerRef.GetItemCount(Caps001))
+		utility.wait(10)
+		DM_DeathMarker.PlaceAtMe(DM_CapsDropACTI)
+		PlayerRef.RemoveItem(Caps001, -1)
+		ObjectReference[] settlements = new ObjectReference[0]
+		int i = DM_SettlementList.GetSize()
+		While (i)
+			i -= 1
+			settlements.Add(DM_SettlementList.GetAt(i) as ObjectReference)	
+		EndWhile
+		PlayerRef.MoveTo(settlements[FindNearestSettlement(settlements)])
+	EndFunction
 
 	Function DismissCompanions()
 		trace(self, "Starting to dismiss companions")
@@ -151,6 +193,15 @@ State Respawning
 	; Spawn a clone of the player wearing their armor and items
 	Function SpawnandEquipClone()
 		trace(self, "Spawning Player Clone")
+		; players in power armor need enough time
+		; to exit it before all armor is removed
+		; this should not happen for caps only
+		if PlayerRef.IsInPowerArmor()
+			PlayerRef.SwitchToPowerArmor(None)
+			utility.wait(10)
+		else
+			utility.wait(2)
+		endif
 		; Delete old Clone if exists and set new clone as linked ref
 		Actor clone = DM_DeathMarker.PlaceActorAtMe(PlayerRef.GetActorBase())
 		ObjectReference cloneRef = DM_DeathMarker.getLinkedRef()
@@ -295,10 +346,11 @@ endState
 
 ;FUNCTIONS
 ;================================================
-; Startup mod
-Function StartupDM()
+; Leaves behind only the characters caps on death and dumps 
+; at closest settlement
+Function CapsOnly()
 	;trace(self, "This should not have been called")
-endFunction
+EndFunction
 
 ; Gives the player a random outfit and starting items
 ; TODO: Add more outfits

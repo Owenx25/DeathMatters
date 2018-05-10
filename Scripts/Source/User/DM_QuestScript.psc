@@ -7,6 +7,7 @@ Keyword Property DM_EnabledKeyword Auto const Mandatory
 Keyword Property DM_DisabledKeyword Auto const Mandatory
 Message Property DM_StartMessage Auto const Mandatory
 Message Property DM_EarlyMessage Auto const Mandatory
+FormList Property DM_StartWorkshopList Auto const Mandatory
 
 ; Eventual TODO
 ; - Put in some logic for respawn markers at story tied settlements like Boston Airport, The Castle, and any others
@@ -16,24 +17,33 @@ Message Property DM_EarlyMessage Auto const Mandatory
 
 Event OnQuestInit()
 	trace(self, "Death Matters Quest Initialized")
-	ObjectReference SanctuaryID = Game.GetForm(0x000250FE) as ObjectReference ;Sanctuary 27
-	; Mod shouldn't start until player gets sanctuary as a settlement
-	SanctuaryRef = SanctuaryID as workshopscript
-	if SanctuaryRef
-		if SanctuaryRef.OwnedbyPlayer
-			trace(self, "Player owns sanctuary on QuestInit pass")
-			; startup death matters
+	int index = DM_StartWorkshopList.GetSize() - 1
+	bool break = false
+	while index
+		; Check if player owns any settlements at startup
+		ObjectReference settlementObj = DM_StartWorkshopList.GetAt(index) as ObjectReference
+		workshopscript settlement = settlementObj as workshopscript 
+		if settlement.OwnedbyPlayer && !break
+			trace(self, "Player owns settlement on QuestInit pass")
 			PlayerRef.AddKeyword(DM_EnabledKeyword)
 			DM_StartMessage.Show()
 			if (PlayerRef.GetItemCount(DM_Holotape) == 0)
 				PlayerRef.AddItem(DM_Holotape, 1)
 			endif
 			PlayerRef.SetEssential(true)
+			break = true
+		EndIf
+		; If we found a settlement we can fast-foward to the end of the loop
+		if break
+			index = 0
 		else
-			trace(self, "No sanctuary on QuestInit pass")
-			DM_EarlyMessage.Show()
-			PlayerRef.AddKeyword(DM_DisabledKeyword)
+			index -= 1
 		endif
+	endWhile
+	if !break
+		trace(self, "No settlement found on QuestInit pass")
+		DM_EarlyMessage.Show()
+		PlayerRef.AddKeyword(DM_DisabledKeyword)
 	endif
 EndEvent
 
