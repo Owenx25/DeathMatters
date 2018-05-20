@@ -286,16 +286,20 @@ State Respawning
 		trace(self, "Calculating settlement effects")
 		WorkshopScript workshopRef = workshopParent.GetWorkshopFromLocation(settlements[settlementIndex].GetCurrentLocation())
 		ObjectReference[] settlementMembers = workshopParent.GetWorkshopActors(workshopRef)
+		ObjectReference[] genericSettlers = new ObjectReference[0]
 		; Narrow settler list down to generic NPCS
+		; Can't use for each loop so need to remember unique indices 
 		int index = 0
 		while index < settlementMembers.Length
 			Actor settler = settlementMembers[index] as Actor
-			if (settler.GetActorBase().isUnique())
-				settlementMembers.Remove(index)
+			trace(self, "Checking Actor: " + settler)
+			if !settler.GetActorBase().isUnique()
+				trace(self, "Actor: " + settler + " is generic")
+				genericSettlers.Add(settlementMembers[index])
 			endif
 			index += 1
 		endWhile
-		trace(self, "There are " + settlementMembers.Length + " potential settlers to replace")
+		trace(self, "There are " + genericSettlers.Length + " potential settlers to replace")
 		
 		; The player is respawned at the nearest owned settlement where generic population is > 0
 		;  - If nearest settlement has no generic settlers or is unowned the next best settlement is checked and so on...
@@ -303,10 +307,10 @@ State Respawning
 		;    Sanctuary without any impact to the settlement
 		;	 (this will probably happen more if player is early game but should stop once player gets
 		;	  more settlements)
-		if (settlementMembers.Length > 0 && workshopRef.OwnedbyPlayer)
+		if (genericSettlers.Length > 0 && workshopRef.OwnedbyPlayer)
 			trace(self, "Replacing settler at " + workshopRef)
-			workshopParent.RemoveActorFromWorkshopPUBLIC(settlementMembers[0] as WorkshopNPCScript)
-			settlementMembers[0].Delete()
+			workshopParent.RemoveActorFromWorkshopPUBLIC(genericSettlers[0] as WorkshopNPCScript)
+			genericSettlers[0].Delete()
 			PlayerRef.MoveTo(settlements[settlementIndex])
 		else
 			if (!settlements.Length)
