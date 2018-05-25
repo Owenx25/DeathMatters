@@ -59,7 +59,7 @@ auto State WaitingForDeath
 	; Onload verify if DM is enabled or not
 	Event OnPlayerLoadGame()
 		; If the player previously was missing a settlement check again
-		if PlayerRef.HasKeyword(DM_DisabledKeyword)
+		if PlayerRef.HasKeyword(DM_DisabledKeyword) || !PlayerRef.HasKeyword(DM_EnabledKeyword)
 			int index = DM_StartWorkshopList.GetSize() - 1
 			bool break = false
 			while index
