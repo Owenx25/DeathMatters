@@ -3,8 +3,6 @@ ScriptName DM_QuestScript Extends Quest
 workshopscript SanctuaryRef
 Actor Property PlayerRef Auto Mandatory
 Holotape Property DM_Holotape Auto const Mandatory
-Keyword Property DM_EnabledKeyword Auto const Mandatory
-Keyword Property DM_DisabledKeyword Auto const Mandatory
 Message Property DM_StartMessage Auto const Mandatory
 Message Property DM_EarlyMessage Auto const Mandatory
 FormList Property DM_StartWorkshopList Auto const Mandatory
@@ -25,11 +23,10 @@ Event OnQuestInit()
 		workshopscript settlement = settlementObj as workshopscript 
 		if settlement.OwnedbyPlayer && !break
 			trace(self, "Player owns settlement on QuestInit pass")
-			PlayerRef.AddKeyword(DM_EnabledKeyword)
 			DM_StartMessage.Show()
-			if (PlayerRef.GetItemCount(DM_Holotape) == 0)
+			if PlayerRef.GetItemCount(DM_Holotape) == 0
 				PlayerRef.AddItem(DM_Holotape, 1)
-			endif
+			EndIf
 			PlayerRef.SetEssential(true)
 			break = true
 		EndIf
@@ -43,7 +40,6 @@ Event OnQuestInit()
 	if !break
 		trace(self, "No settlement found on QuestInit pass")
 		DM_EarlyMessage.Show()
-		PlayerRef.AddKeyword(DM_DisabledKeyword)
 	endif
 EndEvent
 

@@ -8,14 +8,28 @@ Actor Property PlayerRef Auto mandatory
 FollowersScript Property Followers const auto mandatory
 ObjectReference Property DM_DeathMarker Auto const mandatory
 Quest Property DM_RecoveryQuest const auto mandatory
-Message Property DM_RespawnMessage Auto const mandatory
-GlobalVariable Property DM_Difficulty Auto const mandatory
-GlobalVariable Property DM_CapsBeforeDeath Auto const mandatory
 Activator Property DM_CapsDropACTI Auto const mandatory
-;ImageSpaceModifier Property RadIModFadeIn Auto const mandatory
+Group DifficultyGlobals
+	GlobalVariable Property DM_CapsBeforeDeath Auto const mandatory
+	GlobalVariable Property DM_Diff_Body Auto const mandatory
+	GlobalVariable Property DM_Diff_Respawn Auto const mandatory
+	GlobalVariable Property DM_Diff_OldBody Auto const mandatory
+	GlobalVariable Property DM_Diff_Tracking Auto const mandatory
+	GlobalVariable Property DM_Diff_Saving Auto const mandatory
+	GlobalVariable Property DM_Diff_Dismiss Auto const mandatory
+endGroup
+Group DifficultyChange
+	DM_PresetDifficultyChangeScript Property setPresetDM const auto mandatory
+	DM_PresetDifficultyChangeScript Property setPresetDL const auto mandatory
+	DM_PresetDifficultyChangeScript Property setPresetRI const auto mandatory
+	DM_DifficultyChangeScript Property setBody const auto mandatory
+	DM_DifficultyChangeScript Property setOldBody  const auto mandatory
+	DM_DifficultyChangeScript Property setRespawn const auto mandatory
+	DM_DifficultyChangeScript Property setSaving const auto mandatory
+	DM_DifficultyChangeScript Property setTracking const auto mandatory
+	DM_DifficultyChangeScript Property setDismiss const auto mandatory
+EndGroup
 Group Startup
-	Keyword Property DM_EnabledKeyword Auto const mandatory
-	Keyword Property DM_DisabledKeyword Auto const mandatory
 	Message Property DM_StartMessage Auto const mandatory
 	Message Property DM_EarlyMessage Auto const mandatory
 	Holotape Property DM_Holotape Auto const mandatory
@@ -28,6 +42,8 @@ Group SettlementEffects
 	ActorBase Property WorkshopNPCGuard const auto mandatory
 EndGroup
 Group StartingItems
+	ActorValue Property Rads Auto mandatory
+	ActorValue Property Health Auto mandatory
 	FormList Property DM_OutfitList Auto const mandatory
 	MiscObject property Caps001 Auto const mandatory
 	Potion property Stimpak Auto const mandatory
@@ -53,36 +69,83 @@ int prevOutfitChoice = -1
 auto State WaitingForDeath
 	;Reserved for Death Matters Difficulty
 	Event OnInit()
-		RegisterForPlayerSleep()
+		RegisterForCustomEvent(setBody, "DC_Body")
+		RegisterForCustomEvent(setOldBody, "DC_OldBody")
+		RegisterForCustomEvent(setRespawn, "DC_Respawn")
+		RegisterForCustomEvent(setSaving, "DC_Saving")
+		RegisterForCustomEvent(setTracking, "DC_Tracking")
+		RegisterForCustomEvent(setDismiss, "DC_Dismiss")
+		RegisterForCustomEvent(setPresetDM, "Preset_DM")
+		RegisterForCustomEvent(setPresetDL, "Preset_DL")
+		RegisterForCustomEvent(setPresetRI, "Preset_RI")
+	EndEvent
+
+	Event DM_DifficultyChangeScript.DC_Body(DM_DifficultyChangeScript akSender, Var[] akArgs)		
+		SetDiffBody(akArgs[0] as int)
+		trace(self, "Difficuly setting Body changed to " + akArgs[0])
+	EndEvent
+
+	Event DM_DifficultyChangeScript.DC_OldBody(DM_DifficultyChangeScript akSender, Var[] akArgs)
+		DM_Diff_OldBody.setValueInt(akArgs[0] as int)
+		trace(self, "Difficuly setting OldBody changed to " + akArgs[0])
+	EndEvent
+
+	Event DM_DifficultyChangeScript.DC_Respawn(DM_DifficultyChangeScript akSender, Var[] akArgs)
+		DM_Diff_Respawn.setValueInt(akArgs[0] as int)
+		trace(self, "Difficuly setting Respawn changed to " + akArgs[0])
+	EndEvent
+
+	Event DM_DifficultyChangeScript.DC_Dismiss(DM_DifficultyChangeScript akSender, Var[] akArgs)
+		DM_Diff_Dismiss.setValueInt(akArgs[0] as int)
+		trace(self, "Difficuly setting Dismiss changed to " + akArgs[0])
+	EndEvent
+
+	Event DM_DifficultyChangeScript.DC_Saving(DM_DifficultyChangeScript akSender, Var[] akArgs)
+		SetDiffSaving(akArgs[0] as int)
+		trace(self, "Difficuly setting DisableSaving changed to " + akArgs[0])
+	EndEvent
+
+	Event DM_DifficultyChangeScript.DC_Tracking(DM_DifficultyChangeScript akSender, Var[] akArgs)
+		DM_Diff_Tracking.setValueInt(akArgs[0] as int)
+		trace(self, "Difficuly setting Body changed to " + akArgs[0])
+	EndEvent
+
+	Event DM_PresetDifficultyChangeScript.Preset_DM(DM_PresetDifficultyChangeScript akSender, Var[] akArgs)
+		SetDiffBody(2)
+		SetDiffSaving(2)
+		DM_Diff_Dismiss.setValueInt(1)
+		DM_Diff_OldBody.setValueInt(1)
+		DM_Diff_Respawn.setValueInt(1)
+		DM_Diff_Tracking.setValueInt(1)
+	EndEvent
+	Event DM_PresetDifficultyChangeScript.Preset_DL(DM_PresetDifficultyChangeScript akSender, Var[] akArgs)
+		SetDiffBody(4)
+		SetDiffSaving(2)
+		DM_Diff_Dismiss.setValueInt(2)
+		DM_Diff_Respawn.setValueInt(4)
+	EndEvent
+	Event DM_PresetDifficultyChangeScript.Preset_RI(DM_PresetDifficultyChangeScript akSender, Var[] akArgs)
+		SetDiffBody(3)
+		SetDiffSaving(1)
+		DM_Diff_Dismiss.setValueInt(2)
+		DM_Diff_Respawn.setValueInt(3)
+		DM_Diff_Tracking.setValueInt(1)
+		DM_Diff_OldBody.setValueInt(1)
+		trace(self, "Difficuly Preset changed to " + akArgs[0])
 	EndEvent
 
 	; Onload verify if DM is enabled or not
 	Event OnPlayerLoadGame()
-		; If the player previously was missing a settlement check again
-		if PlayerRef.HasKeyword(DM_DisabledKeyword) || !PlayerRef.HasKeyword(DM_EnabledKeyword)
-			int index = DM_StartWorkshopList.GetSize() - 1
-			bool break = false
-			while index
-				ObjectReference settlementObj = DM_StartWorkshopList.GetAt(index) as ObjectReference
-				workshopscript settlement = settlementObj as workshopscript
-				if settlement.OwnedbyPlayer && !break
-					trace(self, "Player owns settlement on later pass")
-					; startup death matters
-					PlayerRef.AddKeyword(DM_EnabledKeyword)
-					DM_StartMessage.Show()
-					if (PlayerRef.GetItemCount(DM_Holotape) == 0)
-						PlayerRef.AddItem(DM_Holotape, 1)
-					endif
-					PlayerRef.SetEssential(true)
-					break = true
+		; If mod still not started check again
+		if !isModEnabled()
+			if PlayerOwnsSettlement()
+				trace(self, "Player owns settlement on later pass")
+				DM_StartMessage.Show()
+				if PlayerRef.GetItemCount(DM_Holotape) == 0
+					PlayerRef.AddItem(DM_Holotape, 1)
 				EndIf
-				if break
-					index = 0
-				else
-					index -= 1
-				endif
-			endWhile
-			if !break
+				PlayerRef.SetEssential(true)
+			else
 				trace(self, "Player still missing owned settlement on later pass")
 				DM_EarlyMessage.Show()
 			endif
@@ -91,7 +154,7 @@ auto State WaitingForDeath
 
 	;Reserved for "Death Matters" Difficulty
 	Event OnPlayerSleepStop(bool abInterrupted, ObjectReference akBed)
-		if DM_Difficulty.GetValueInt() == 2
+		if DM_Diff_Saving.GetValueInt() == 1
 			Game.SetInCharGen(false, false, false)
 			Game.RequestSave()
 			Game.SetInCharGen(true, false, false)
@@ -100,7 +163,7 @@ auto State WaitingForDeath
 
 	Event OnEnterBleedout()
 		GotoState("Respawning")
-	EndEvent
+	EndEvent	
 endState
 
 State Respawning
@@ -126,17 +189,21 @@ State Respawning
 		Game.FadeoutGame(true, true, 1, 2, true)
 		DM_DeathMarker.Disable()
 		DM_DeathMarker.MoveTo(PlayerRef)
-		;Debug.SetGodMode(true)
-		if DM_Difficulty.GetValueInt() == 0
-			CapsOnly()
-		else
-			SpawnandEquipClone()
-			EquipPlayer()
-			DismissCompanions()
-			DetermineSettlementCost()
-		endif
 		
-
+		; players in power armor need enough time
+		; to exit it before all armor is removed
+		; this should only happen for ArmorOnly and AllItems
+		if PlayerRef.IsInPowerArmor() && (DM_Diff_Body.GetValueInt() == 2 || DM_Diff_Body.GetValueInt() == 3)
+			PlayerRef.SwitchToPowerArmor(None)
+			utility.wait(10)
+		else
+			utility.wait(2)
+		endif
+		Body()
+		DismissCompanions()
+		Respawn()
+		PlayerRef.RestoreValue(Rads, 9999)
+		PlayerRef.RestoreValue(Health, 9999) 
 		; Fade back in and unmute sounds
 		DM_DeathMarker.Enable()
 		Game.FadeoutGame(false, false, 2, 2)
@@ -146,33 +213,97 @@ State Respawning
 
 		trace(self, "Player has successfully respawned")
 
-		DM_RespawnMessage.Show()
 		; Wait a few seconds then trigger Recovery
 		utility.wait(5)
-		if (!DM_RecoveryQuest.isRunning())
+		if (!DM_RecoveryQuest.isRunning() && DM_Diff_Tracking.GetValueInt() == 1)
 			trace(self, "Starting recovery Quest")
 			DM_RecoveryQuest.Start()	
 		endif
 		GotoState("WaitingForDeath")
 	EndEvent
 
-	Function CapsOnly()
-		; Remove only the players caps
-		; Move them to closest settlement
-		DM_CapsBeforeDeath.SetValue(PlayerRef.GetItemCount(Caps001))
-		utility.wait(10)
-		DM_DeathMarker.PlaceAtMe(DM_CapsDropACTI)
-		PlayerRef.RemoveItem(Caps001, -1)
+	Function Respawn()
+		; Move SettlementList into an objectref array for settlement effects
 		ObjectReference[] settlements = new ObjectReference[0]
 		int i = DM_SettlementList.GetSize()
 		While (i)
 			i -= 1
 			settlements.Add(DM_SettlementList.GetAt(i) as ObjectReference)	
 		EndWhile
-		PlayerRef.MoveTo(settlements[FindNearestSettlement(settlements)])
-	EndFunction
+		int settlementIndex = FindNearestSettlement(settlements)
+		; Determine where player should respawn based on Settings
+		if DM_Diff_Respawn.GetValueInt() == 3 ;Random Settlement
+			PlayerRef.MoveTo(settlements[Utility.RandomInt(0, settlements.Length - 1)])
+		elseif DM_Diff_Respawn.GetValueInt() == 4 ;Nearest Settlement
+			PlayerRef.MoveTo(settlements[settlementIndex])
+		elseif DM_Diff_Respawn.GetValueInt() == 2 ; Nearest Settlement(Owned)
+			WorkshopScript workshopRef = workshopParent.GetWorkshopFromLocation(settlements[settlementIndex].GetCurrentLocation())
+			while (!workshopRef.OwnedbyPlayer && settlements.Length)
+				settlements.Remove(settlementIndex)
+				settlementIndex = FindNearestSettlement(settlements)
+				workshopRef = workshopParent.GetWorkshopFromLocation(settlements[settlementIndex].GetCurrentLocation())
+			endwhile
+			PlayerRef.MoveTo(settlements[settlementIndex])
+		else
+			EquipPlayer()
+			AffectSettlement(settlements, settlementIndex)
+		endif
+	endFunction
+
+	Function Body()
+		; "No Body" doesn't need to do any of this
+		if DM_Diff_Body.GetValueInt() == 4
+			utility.wait(8)
+			return
+		; On "Caps Only" a caps container is placed at body
+		elseif DM_Diff_Body.GetValueInt() == 1
+			DM_CapsBeforeDeath.SetValue(PlayerRef.GetItemCount(Caps001))
+			DM_DeathMarker.PlaceAtMe(DM_CapsDropACTI)
+			PlayerRef.RemoveItem(Caps001, -1)
+			utility.wait(8)
+			return
+		; Other Difficulties require a clone
+		else
+			; Delete old Clone if exists and set new clone as linked ref
+			Actor clone = DM_DeathMarker.PlaceActorAtMe(PlayerRef.GetActorBase())
+			ObjectReference cloneRef = DM_DeathMarker.getLinkedRef()
+			if cloneRef && (DM_Diff_OldBody.GetValueInt() == 1) 
+				trace(self, "Old clone deleted")
+				cloneRef.delete()		
+			endif
+			DM_DeathMarker.SetLinkedRef(clone)
+			clone.RemoveAllItems()
+			; Unequip player to figure out what they're wearing
+			playerEquippedArmor = new Form[0]
+			int BipedSlotindex = 0
+			while BipedSlotindex < 29
+				playerRef.UnequipItemSlot(BipedSlotindex)
+				BipedSlotindex += 1
+			endWhile
+			; Clone physics get all broken if you don't wait here	
+			utility.wait(8)
+			trace(self, "Player Equipped Armor has length " + playerEquippedArmor.Length)
+			; Equip clone with player's armor	
+			while playerEquippedArmor.Length
+				PlayerRef.removeItem(playerEquippedArmor[0], 1, true, clone)
+				clone.EquipItem(playerEquippedArmor[0], true, true)
+				playerEquippedArmor.Remove(0)
+			endWhile
+			; Transfer player's Items to clone
+			if DM_Diff_Body.GetValueInt() == 2
+				PlayerRef.RemoveAllItems(clone)
+			endif	
+			; Filthy Synth!
+			clone.kill()
+			DM_DeathMarker.MoveTo(clone)
+			trace(self, "Player Clone killed")
+		endif
+	endFunction
 
 	Function DismissCompanions()
+		if DM_Diff_Dismiss.GetValueInt() == 2
+			return
+		endif
 		trace(self, "Starting to dismiss companions")
 		Actor[] playerParty = Game.GetPlayerFollowers()
 		int count = playerParty.Length
@@ -190,56 +321,6 @@ State Respawning
 		EndWhile
 	EndFunction
 
-	; Spawn a clone of the player wearing their armor and items
-	Function SpawnandEquipClone()
-		trace(self, "Spawning Player Clone")
-		; players in power armor need enough time
-		; to exit it before all armor is removed
-		; this should not happen for caps only
-		if PlayerRef.IsInPowerArmor()
-			PlayerRef.SwitchToPowerArmor(None)
-			utility.wait(10)
-		else
-			utility.wait(2)
-		endif
-		; Delete old Clone if exists and set new clone as linked ref
-		Actor clone = DM_DeathMarker.PlaceActorAtMe(PlayerRef.GetActorBase())
-		ObjectReference cloneRef = DM_DeathMarker.getLinkedRef()
-		if cloneRef
-			trace(self, "Old clone deleted")
-			cloneRef.delete()		
-		endif
-		DM_DeathMarker.SetLinkedRef(clone)
-
-		; Remove default vault outfit from clone
-		clone.UnequipAll()
-		
-		; Unequip player to figure out what they're wearing
-		playerEquippedArmor = new Form[20]
-		int BipedSlotindex = 0
-		while BipedSlotindex < 20
-			playerRef.UnequipItemSlot(BipedSlotindex)
-			BipedSlotindex = BipedSlotindex + 1
-		endWhile
-
-		; Transfer players Items to clone
-		PlayerRef.RemoveAllItems(clone)
-		
-		; Clone physics get all broken if you don't wait here	
-		utility.wait(8)
-		
-		; Equip clone with player's armor	
-		BipedSlotindex = playerEquippedArmor.Length
-		while BipedSlotindex
-			BipedSlotindex -= 1
-			clone.EquipItem(playerEquippedArmor[BipedSlotindex], true, true)
-		endWhile
-		
-		; Filthy Synth!
-		clone.kill()
-		trace(self, "Player Clone killed")
-	EndFunction
-
 	Function EquipPlayer()
 		; Select a random index from formlist
 		; Equip player with that outfit
@@ -254,7 +335,7 @@ State Respawning
 		; (Inititially tried this with outfit type but too buggy)
 		trace(self, "Outfit " + choice + " chosen for player")
 		FormList respawnOutfit = DM_OutfitList.GetAt(choice) as FormList
-		int index = DM_OutfitList.GetSize()
+		int index = respawnOutfit.GetSize()
 		while index
 			index -= 1
 			PlayerRef.AddItem(respawnOutfit.GetAt(index), 1, true)
@@ -264,22 +345,6 @@ State Respawning
 		playerRef.AddItem(Stimpak, 5, true)
 		playerRef.AddItem(LL_PipeGun, 1, true)
 		playerRef.AddItem(Ammo38Caliber, 100, true)	
-	EndFunction
-
-	Function DetermineSettlementCost()
-		; Move SettlementList into an objectref array for settlement effects
-		ObjectReference[] settlements = new ObjectReference[0]
-		int i = DM_SettlementList.GetSize()
-		While (i)
-			i -= 1
-			settlements.Add(DM_SettlementList.GetAt(i) as ObjectReference)	
-		EndWhile
-
-		; Find closest settlement and respawn player there
-		; Player doesn't actually get moved until AffectSettlement() runs
-		int settlementIndex = FindNearestSettlement(settlements)
-		AffectSettlement(settlements, settlementIndex)
-		utility.wait(1)
 	EndFunction
 
 	Function AffectSettlement(ObjectReference[] settlements, int settlementIndex)
@@ -305,8 +370,6 @@ State Respawning
 		;  - If nearest settlement has no generic settlers or is unowned the next best settlement is checked and so on...
 		;  - If somehow the player has no qualified settlement they are simply respawned at
 		;    Sanctuary without any impact to the settlement
-		;	 (this will probably happen more if player is early game but should stop once player gets
-		;	  more settlements)
 		if (genericSettlers.Length > 0 && workshopRef.OwnedbyPlayer)
 			trace(self, "Replacing settler at " + workshopRef)
 			workshopParent.RemoveActorFromWorkshopPUBLIC(genericSettlers[0] as WorkshopNPCScript)
@@ -325,55 +388,37 @@ State Respawning
 		endif
 	EndFunction
 
-	int Function FindNearestSettlement(ObjectReference[] settlements)
-		trace(self, "Calculate closest settlement")
-		ObjectReference settlement = settlements[0]
-		float distanceToSettlement = PlayerRef.GetDistance(settlement)
-		int closestSettlementIndex = 0
-		; Run through list of settlements and find closest one
-		int index = 1
-		while index < settlements.Length
-			settlement = settlements[index]
-			if settlement
-				if PlayerRef.GetDistance(settlement) < distanceToSettlement
-					distanceToSettlement = PlayerRef.GetDistance(settlement)
-					closestSettlementIndex = index
-				endif
-			endif
-			index += 1
-		endWhile 
-		trace(self, "Closest settlement is " + closestSettlementIndex)
-		return closestSettlementIndex
-	EndFunction
+	
 endState
-
 
 ;FUNCTIONS
 ;================================================
-; Leaves behind only the characters caps on death and dumps 
-; at closest settlement
-Function CapsOnly()
-	;trace(self, "This should not have been called")
-EndFunction
-
 ; Gives the player a random outfit and starting items
 ; TODO: Add more outfits
 Function EquipPlayer()
 	;trace(self, "This should not have been called")
 EndFunction
 
+; This function makes the following assumptions:
+;	- player has been removed from power armor
+;	- DM_DeathMarker is at player
+;	- Player is still where they 'died' with all gear
+;	- Clone hasn't been spawned
+; Create Body based on difficulty setting
+Function Body()
+EndFunction
+
+; This function makes the following assumptions:
+;	- Player is still where they 'died'
+;	- Nearest Settlement is unknown
+;	- DM_DeathMarker has been moved to player
+; Respawn Player based on difficulty setting
+Function Respawn()
+EndFunction
+
 ; Dismisses the players current companions on death
 ; Not sure what will happen with other/quest-related companions
 Function DismissCompanions()
-	;trace(self, "This should not have been called")
-EndFunction
-
-; Spawn a clone of the player wearing their armor and items
-Function SpawnandEquipClone()
-	;trace(self, "This should not have been called")
-EndFunction
-
-Function DetermineSettlementCost()
 	;trace(self, "This should not have been called")
 EndFunction
 
@@ -389,6 +434,84 @@ EndFunction
 ;NOTE: This function returns an index instead of an objectref because
 ;      AffectSettlement needs to know the settlement index for Removing
 int Function FindNearestSettlement(ObjectReference[] settlements)
-	;trace(self, "This should not have been called")
-	return 0
+	trace(self, "Calculate closest settlement")
+	ObjectReference settlement = settlements[0]
+	float distanceToSettlement = PlayerRef.GetDistance(settlement)
+	int closestSettlementIndex = 0
+	; Run through list of settlements and find closest one
+	int index = 1
+	while index < settlements.Length
+		settlement = settlements[index]
+		if settlement
+			if PlayerRef.GetDistance(settlement) < distanceToSettlement
+				distanceToSettlement = PlayerRef.GetDistance(settlement)
+				closestSettlementIndex = index
+			endif
+		endif
+		index += 1
+	endWhile 
+	trace(self, "Closest settlement is " + closestSettlementIndex)
+	return closestSettlementIndex
 EndFunction
+
+; Check if mod is enabled/disabled
+bool Function isModEnabled()
+	if PlayerRef.GetItemCount(DM_Holotape) == 0
+		return false
+	else
+		return true
+	endif
+endFunction
+
+; Check if player owns settlement
+bool Function PlayerOwnsSettlement()
+	int index = DM_StartWorkshopList.GetSize() - 1
+		while index
+			ObjectReference settlementObj = DM_StartWorkshopList.GetAt(index) as ObjectReference
+			workshopscript settlement = settlementObj as workshopscript
+			if settlement.OwnedbyPlayer
+				return true
+			EndIf
+			index -= 1
+		endWhile
+		return false
+endFunction
+
+Function SetDiffBody(int newValue)
+	DM_Diff_Body.setValueInt(newValue)
+	;Disable tracking when no body
+	if (newValue == 4)
+		DM_Diff_Tracking.setValueInt(2)
+	endif
+EndFunction
+
+Function SetDiffSaving(int newValue)
+	DM_Diff_Saving.setValueInt(newValue)
+	if (newValue == 1)
+		RegisterForPlayerSleep()
+		Game.SetInCharGen(true, false, false)
+	else
+		UnregisterForPlayerSleep()
+		Game.SetInCharGen(false, false, false)
+	endif
+EndFunction
+
+; Difficulty Change Event Stubs
+Event DM_DifficultyChangeScript.DC_Body(DM_DifficultyChangeScript akSender, Var[] akArgs)
+EndEvent
+Event DM_DifficultyChangeScript.DC_OldBody(DM_DifficultyChangeScript akSender, Var[] akArgs)
+EndEvent
+Event DM_DifficultyChangeScript.DC_Respawn(DM_DifficultyChangeScript akSender, Var[] akArgs)
+EndEvent
+Event DM_DifficultyChangeScript.DC_Saving(DM_DifficultyChangeScript akSender, Var[] akArgs)
+EndEvent
+Event DM_DifficultyChangeScript.DC_Tracking(DM_DifficultyChangeScript akSender, Var[] akArgs)
+EndEvent
+Event DM_DifficultyChangeScript.DC_Dismiss(DM_DifficultyChangeScript akSender, Var[] akArgs)
+EndEvent
+Event DM_PresetDifficultyChangeScript.Preset_DM(DM_PresetDifficultyChangeScript akSender, Var[] akArgs)
+EndEvent
+Event DM_PresetDifficultyChangeScript.Preset_DL(DM_PresetDifficultyChangeScript akSender, Var[] akArgs)
+EndEvent
+Event DM_PresetDifficultyChangeScript.Preset_RI(DM_PresetDifficultyChangeScript akSender, Var[] akArgs)
+EndEvent
