@@ -286,6 +286,7 @@ State Respawning
 			; Equip clone with player's armor	
 			while playerEquippedArmor.Length
 				PlayerRef.removeItem(playerEquippedArmor[0], 1, true, clone)
+				Utility.Wait(0.5)
 				clone.EquipItem(playerEquippedArmor[0], true, true)
 				playerEquippedArmor.Remove(0)
 			endWhile

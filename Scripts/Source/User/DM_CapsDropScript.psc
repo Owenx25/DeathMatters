@@ -8,7 +8,12 @@ EVENT OnLoad()
 endEVENT
 
 EVENT OnActivate(ObjectReference akActionRef)
-	akActionRef.addItem(Caps001, DM_CapsBeforeDeath.GetValueInt())
+	int caps = DM_CapsBeforeDeath.GetValueInt()
+	while caps > 65000
+		PlayerRef.AddItem(Caps001, 65000)
+		caps -= 65000
+	endWhile
+	akActionRef.addItem(Caps001, caps)
 	disable()
 	delete()
 endEVENT
